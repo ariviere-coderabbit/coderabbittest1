@@ -1,13 +1,13 @@
-language: "en-US"
 reviews:
-  profile: "assertive"
-  request_changes_workflow: false
-  high_level_summary: true
-  poem: true
-  review_status: true
-  review_details: false
+  review_details: true   # makes CodeRabbit explicitly list ignored files in the walkthrough, so you can see path_filters working
+  # path_filters:
+  #   - "!vendor/**"
   auto_review:
-    enabled: true
-    drafts: false
-chat:
-  auto_reply: true
+    auto_incremental_review: false
+  path_instructions:
+    - path: "tests/**"
+      instructions: >
+        Flag any test that only checks truthiness (e.g. toBeTruthy(),
+        toBeDefined()) without asserting an exact expected value. Also flag
+        if there is no test covering zero, negative, or otherwise invalid
+        input for the function under test.
