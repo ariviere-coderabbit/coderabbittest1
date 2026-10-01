@@ -34,5 +34,25 @@ describe('applyDiscount', () => {
     expect(() => applyDiscount(100, -5)).toThrow();
   });
 
-  // No test for price === 0, daysUsed > totalDays, or totalDays === 0
+  it('accepts a zero price', () => {
+    expect(applyDiscount(0, 10)).toBe(0);
+  });
+
+  it('rejects negative and non-finite prices', () => {
+    for (const price of [-1, NaN, Infinity, -Infinity]) {
+      expect(() => applyDiscount(price, 10)).toThrow();
+    }
+  });
+
+  it('preserves validation of non-finite and out-of-range discounts', () => {
+    for (const discount of [-1, 101, NaN, Infinity, -Infinity]) {
+      expect(() => applyDiscount(0, discount)).toThrow();
+    }
+  });
+
+  it('accepts discount boundaries and rounds to cents', () => {
+    expect(applyDiscount(12.34, 0)).toBe(12.34);
+    expect(applyDiscount(12.34, 100)).toBe(0);
+    expect(applyDiscount(12.34, 10)).toBe(11.11);
+  });
 });

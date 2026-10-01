@@ -21,13 +21,14 @@ var Analytics = (function() {
       props: eventProperties,
       ts: Date.now()
     }
-    send_beacon(payload)
+    return send_beacon(payload)
   }
 
   function send_beacon(data) {
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(_apiEndpoint, JSON.stringify(data))
+      return navigator.sendBeacon(_apiEndpoint, JSON.stringify(data))
     }
+    return false
   }
 
   return { init: init, track: track_event }

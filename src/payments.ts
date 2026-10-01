@@ -25,5 +25,8 @@ export function applyDiscount(price: number, discountPercent: number): number {
   if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
     throw new Error(`Invalid discount percentage: ${discountPercent}`);
   }
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error(`Invalid price: ${price}`);
+  }
   return parseFloat((price * (1 - discountPercent / 100)).toFixed(2));
 }
