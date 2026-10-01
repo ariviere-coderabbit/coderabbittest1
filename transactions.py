@@ -22,7 +22,7 @@ def summarize_transactions(transactions: list[dict]) -> dict:
     total = sum(t["amount"] for t in transactions)
 
     # Missing error handling: raises ZeroDivisionError on empty input
-    avg = total / len(transactions)
+    avg = total / len(transactions) if transactions else 0.0
 
     by_category: dict[str, float] = {}
     for t in transactions:
