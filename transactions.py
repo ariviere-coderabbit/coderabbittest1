@@ -34,12 +34,20 @@ def summarize_transactions(transactions: list[dict]) -> dict:
     largeTxns = [t for t in transactions if t["amount"] >= LARGE_TRANSACTION_THRESHOLD]
 
     # Inefficient: `seen` is a list, so `in` is O(n) — overall O(n^2)
-    seen = []
     duplicate_ids = []
-    for t in transactions:
-        if t["id"] in seen:
-            duplicate_ids.append(t["id"])
-        seen.append(t["id"])
+    try:
+        seen = set()
+        for t in transactions:
+            if t["id"] in seen:
+                duplicate_ids.append(t["id"])
+            seen.add(t["id"])
+    except TypeError:
+        seen = []
+        duplicate_ids = []
+        for t in transactions:
+            if t["id"] in seen:
+                duplicate_ids.append(t["id"])
+            seen.append(t["id"])
 
     return {
         "total": round(total, 2),
