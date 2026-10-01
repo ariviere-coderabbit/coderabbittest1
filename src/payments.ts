@@ -7,7 +7,13 @@ export interface RefundRequest {
 export function calculateProRatedRefund(request: RefundRequest): number {
   const { totalPaid, daysUsed, totalDays } = request;
 
-  // Bug: no guard against totalDays === 0 — returns Infinity or NaN silently
+  if (
+    !Number.isFinite(totalPaid) || !Number.isFinite(daysUsed) || !Number.isFinite(totalDays) ||
+    totalPaid < 0 || totalDays <= 0 || daysUsed < 0 || daysUsed > totalDays
+  ) {
+    throw new Error(`Invalid refund request: totalPaid=${totalPaid}, daysUsed=${daysUsed}, totalDays=${totalDays}`);
+  }
+
   const dailyRate = totalPaid / totalDays;
   const remainingDays = totalDays - daysUsed;
   const refund = dailyRate * remainingDays;
@@ -16,7 +22,7 @@ export function calculateProRatedRefund(request: RefundRequest): number {
 }
 
 export function applyDiscount(price: number, discountPercent: number): number {
-  if (discountPercent < 0 || discountPercent > 100) {
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
     throw new Error(`Invalid discount percentage: ${discountPercent}`);
   }
   return parseFloat((price * (1 - discountPercent / 100)).toFixed(2));
