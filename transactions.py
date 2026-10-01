@@ -31,7 +31,7 @@ def summarize_transactions(transactions: list[dict]) -> dict:
 
     # Logic bug: uses > instead of >=, so a transaction of exactly
     # LARGE_TRANSACTION_THRESHOLD is not counted as large
-    largeTxns = [t for t in transactions if t["amount"] > LARGE_TRANSACTION_THRESHOLD]
+    largeTxns = [t for t in transactions if t["amount"] >= LARGE_TRANSACTION_THRESHOLD]
 
     # Inefficient: `seen` is a list, so `in` is O(n) — overall O(n^2)
     seen = []
