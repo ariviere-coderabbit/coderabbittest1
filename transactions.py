@@ -21,7 +21,6 @@ def summarize_transactions(transactions: list[dict]) -> dict:
     """Return a summary of parsed transactions."""
     total = sum(t["amount"] for t in transactions)
 
-    # Missing error handling: raises ZeroDivisionError on empty input
     avg = total / len(transactions) if transactions else 0.0
 
     by_category: dict[str, float] = {}
@@ -29,11 +28,9 @@ def summarize_transactions(transactions: list[dict]) -> dict:
         cat = t["category"]
         by_category[cat] = by_category.get(cat, 0) + t["amount"]
 
-    # Logic bug: uses > instead of >=, so a transaction of exactly
-    # LARGE_TRANSACTION_THRESHOLD is not counted as large
     largeTxns = [t for t in transactions if t["amount"] >= LARGE_TRANSACTION_THRESHOLD]
 
-    # Inefficient: `seen` is a list, so `in` is O(n) — overall O(n^2)
+    # Falls back to a list if any transaction ID is unhashable.
     duplicate_ids = []
     try:
         seen = set()
