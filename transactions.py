@@ -1,4 +1,5 @@
 from datetime import datetime
+import math
 
 
 LARGE_TRANSACTION_THRESHOLD = 1000.0
@@ -61,15 +62,15 @@ VALID_CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD"}
 def validate_transaction(tx: dict) -> dict:
     """Validate required fields and return the same transaction dict unchanged.
 
-    The ``amount`` must be convertible to float and must not be zero or
-    negative; NaN and positive infinity are accepted. The ``currency`` must
+    The ``amount`` must not be a Boolean and must be convertible to a finite
+    float greater than zero. The ``currency`` must
     be a string matching USD, EUR, GBP, CAD, or AUD after stripping surrounding
     whitespace and converting to uppercase. Converted values are not stored.
 
     Raises:
         Exception: If a required field is missing or validation fails, with
             a message prefixed by "Invalid transaction: ". Currency validation
-            failures use "Invalid transaction: Failed to validate currency".
+            failures include the reason and offending currency value.
             Any other Exception raised during validation is also wrapped
             with this prefix.
     """
@@ -79,30 +80,26 @@ def validate_transaction(tx: dict) -> dict:
         except KeyError:
             raise Exception("Transaction is missing required field: amount")
 
+        if isinstance(amount, bool):
+            raise Exception("Transaction amount must be a number")
+
         try:
             amount = float(amount)
         except Exception:
             raise Exception("Transaction amount must be a number")
 
-        if amount <= 0:
-            raise Exception("Transaction amount must be greater than zero")
+        if not math.isfinite(amount) or amount <= 0:
+            raise Exception("Transaction amount must be finite and greater than zero")
 
         try:
             currency = tx["currency"]
         except KeyError:
             raise Exception("Transaction is missing required field: currency")
 
-        try:
-            if not isinstance(currency, str):
-                raise Exception("Currency must be a string")
-            try:
-                currency = currency.strip().upper()
-                if currency not in VALID_CURRENCIES:
-                    raise Exception(f"Unsupported currency: {currency}")
-            except Exception:
-                raise Exception("Currency code is invalid")
-        except Exception:
-            raise Exception("Failed to validate currency")
+        if not isinstance(currency, str):
+            raise Exception(f"Currency must be a string: {currency!r}")
+        if currency.strip().upper() not in VALID_CURRENCIES:
+            raise Exception(f"Unsupported currency: {currency!r}")
 
     except Exception as e:
         raise Exception(f"Invalid transaction: {e}")
