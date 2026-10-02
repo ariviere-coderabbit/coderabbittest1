@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Optional
+from math import isfinite
+from uuid import uuid4
 
 
 MAX_RETRY_ATTEMPTS = 3
@@ -14,6 +16,12 @@ class SubscriptionPlan:
     price_per_cycle: float
     cycle_days: int
     features: list[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not isfinite(self.cycle_days) or self.cycle_days <= 0:
+            raise ValueError("cycle_days must be finite and greater than zero")
+        if not isfinite(self.price_per_cycle) or self.price_per_cycle < 0:
+            raise ValueError("price_per_cycle must be finite and nonnegative")
 
 
 @dataclass
@@ -30,19 +38,25 @@ class Subscription:
     metadata: dict = field(default_factory=dict)
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Normalize dates to UTC, treating legacy naive dates as UTC."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def process_renewal(subscription: Subscription) -> dict:
     """Process a subscription renewal at the end of its billing cycle."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if subscription.status == "canceled":
         raise ValueError(
             f"Cannot renew canceled subscription {subscription.subscription_id}"
         )
 
-    days_overdue = (now - subscription.current_period_end).days
+    days_overdue = (now - _as_utc(subscription.current_period_end)).days
 
-    # BUG: should be > 0; this flags renewals as overdue on the exact due date
-    is_overdue = days_overdue >= 0
+    is_overdue = days_overdue > 0
 
     late_fee = 0.0
     if is_overdue and days_overdue > 0:
@@ -73,9 +87,7 @@ def retry_failed_payment(subscription: Subscription, attempt: int) -> dict:
     Determine retry timing using exponential backoff.
     Returns a dict describing when to retry and whether to cancel.
     """
-    # BUG: >= causes the last valid attempt (attempt == MAX_RETRY_ATTEMPTS) to be skipped;
-    # should be > MAX_RETRY_ATTEMPTS to allow exactly MAX_RETRY_ATTEMPTS retries
-    if attempt >= MAX_RETRY_ATTEMPTS:
+    if attempt > MAX_RETRY_ATTEMPTS:
         return {
             "subscription_id": subscription.subscription_id,
             "should_cancel": True,
@@ -83,8 +95,7 @@ def retry_failed_payment(subscription: Subscription, attempt: int) -> dict:
             "attempt": attempt,
         }
 
-    # BUG: attempt is 1-indexed here, so attempt=1 → 2^1=2h instead of 2^0=1h
-    backoff_hours = 2 ** attempt
+    backoff_hours = 2 ** (attempt - 1)
     retry_at = datetime.utcnow() + timedelta(hours=backoff_hours)
 
     return {
@@ -127,7 +138,7 @@ def generate_invoice(
     return {
         "invoice_id": (
             f"inv_{subscription.subscription_id}"
-            f"_{int(datetime.utcnow().timestamp())}"
+            f"_{uuid4().hex}"
         ),
         "subscription_id": subscription.subscription_id,
         "user_id": subscription.user_id,
@@ -159,10 +170,9 @@ def compute_churn_risk(
     total = len(payment_history)
     failure_rate = failed / total
 
-    age_days = (datetime.utcnow() - subscription.start_date).days
+    age_days = (datetime.now(timezone.utc) - _as_utc(subscription.start_date)).days
     age_factor = max(0.0, 1.0 - (age_days / 365))
 
-    # BUG: weights only sum to 0.9 (0.6 + 0.3), so the max score is 0.9, not 1.0
-    score = (failure_rate * 0.6) + (age_factor * 0.3)
+    score = ((failure_rate * 0.6) + (age_factor * 0.3)) / (0.6 + 0.3)
 
     return round(min(max(score, 0.0), 1.0), 4)

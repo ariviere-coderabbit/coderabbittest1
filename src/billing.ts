@@ -38,21 +38,25 @@ export function generateBillingSummary(cycles: BillingCycle[]): BillingSummary {
   const failed = cycles.filter((c) => c.status === "failed");
   const refunded = cycles.filter((c) => c.status === "refunded");
 
+  const currencies = new Set([...paid, ...refunded].map((c) => c.currency));
+  if (currencies.size > 1) {
+    throw new Error("Billing summary requires a single currency for paid and refunded cycles");
+  }
+  if (paid.some((c) => !Number.isFinite(c.billingPeriodDays) || c.billingPeriodDays <= 0)) {
+    throw new Error("Paid billingPeriodDays must be finite and positive");
+  }
+
   const totalRevenue = paid.reduce((sum, c) => sum + c.amount, 0);
   const refundedAmount = refunded.reduce((sum, c) => sum + c.amount, 0);
   const netRevenue = parseFloat((totalRevenue - refundedAmount).toFixed(2));
 
-  const avgCycleDays =
-    paid.reduce((sum, c) => sum + c.billingPeriodDays, 0) / paid.length;
-
-  // BUG: if paid is empty, avgCycleDays is NaN → mrr is NaN; no guard here
   const mrr = parseFloat(
-    ((netRevenue / paid.length) * (30 / avgCycleDays)).toFixed(2)
+    paid.reduce((sum, c) => sum + c.amount * 30 / c.billingPeriodDays, 0).toFixed(2)
   );
 
-  // BUG: divides by total cycles count (all statuses) instead of unique user count
+  const userCount = new Set(cycles.map((c) => c.userId)).size;
   const averageRevenuePerUser = parseFloat(
-    (totalRevenue / cycles.length).toFixed(2)
+    (totalRevenue / userCount).toFixed(2)
   );
 
   return {
@@ -111,7 +115,7 @@ export function groupCyclesByPlan(
       groups[cycle.planId].push(cycle);
       return groups;
     },
-    {} as Record<string, BillingCycle[]>
+    Object.create(null) as Record<string, BillingCycle[]>
   );
 }
 
@@ -119,16 +123,15 @@ export function detectAnomalies(
   cycles: BillingCycle[],
   thresholdMultiplier = 2.5
 ): BillingCycle[] {
-  if (cycles.length < 2) return [];
+  const paid = cycles.filter((c) => c.status === "paid");
+  if (paid.length < 2) return [];
 
-  const amounts = cycles.map((c) => c.amount);
+  const amounts = paid.map((c) => c.amount);
   const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length;
 
-  // BUG: stddev is computed across ALL cycles regardless of status (failed/refunded
-  // cycles with $0 or negative amounts skew the distribution)
   const variance =
     amounts.reduce((sum, a) => sum + Math.pow(a - mean, 2), 0) / amounts.length;
   const stddev = Math.sqrt(variance);
 
-  return cycles.filter((c) => Math.abs(c.amount - mean) > thresholdMultiplier * stddev);
+  return paid.filter((c) => Math.abs(c.amount - mean) > thresholdMultiplier * stddev);
 }
