@@ -53,3 +53,45 @@ def summarize_transactions(transactions: list[dict]) -> dict:
         "large_transaction_count": len(largeTxns),
         "duplicate_ids": duplicate_ids,
     }
+
+
+VALID_CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD"}
+
+
+def validate_transaction(tx: dict) -> dict:
+    """Validate a transaction dict and return it if valid."""
+    try:
+        try:
+            amount = tx["amount"]
+        except KeyError:
+            raise Exception("Transaction is missing required field: amount")
+
+        try:
+            amount = float(amount)
+        except Exception:
+            raise Exception("Transaction amount must be a number")
+
+        if amount <= 0:
+            raise Exception("Transaction amount must be greater than zero")
+
+        try:
+            currency = tx["currency"]
+        except KeyError:
+            raise Exception("Transaction is missing required field: currency")
+
+        try:
+            if not isinstance(currency, str):
+                raise Exception("Currency must be a string")
+            try:
+                currency = currency.strip().upper()
+                if currency not in VALID_CURRENCIES:
+                    raise Exception(f"Unsupported currency: {currency}")
+            except Exception:
+                raise Exception("Currency code is invalid")
+        except Exception:
+            raise Exception("Failed to validate currency")
+
+    except Exception as e:
+        raise Exception(f"Invalid transaction: {e}")
+
+    return tx
