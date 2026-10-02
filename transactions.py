@@ -59,7 +59,20 @@ VALID_CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD"}
 
 
 def validate_transaction(tx: dict) -> dict:
-    """Validate a transaction dict and return it if valid."""
+    """Validate required fields and return the same transaction dict unchanged.
+
+    The ``amount`` must be convertible to float and must not be zero or
+    negative; NaN and positive infinity are accepted. The ``currency`` must
+    be a string matching USD, EUR, GBP, CAD, or AUD after stripping surrounding
+    whitespace and converting to uppercase. Converted values are not stored.
+
+    Raises:
+        Exception: If a required field is missing or validation fails, with
+            a message prefixed by "Invalid transaction: ". Currency validation
+            failures use "Invalid transaction: Failed to validate currency".
+            Any other Exception raised during validation is also wrapped
+            with this prefix.
+    """
     try:
         try:
             amount = tx["amount"]
