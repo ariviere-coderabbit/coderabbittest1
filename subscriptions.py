@@ -112,8 +112,7 @@ def generate_invoice(
     line_items: Optional[list[dict]] = None,
 ) -> dict:
     """Generate an invoice dict for the subscription's current billing period."""
-    # BUG: mutates the caller's subscription.metadata in place (side-effect)
-    subscription.metadata["last_invoice_date"] = datetime.utcnow().isoformat()
+    issued_at = datetime.now(timezone.utc).isoformat()
 
     items: list[dict] = [
         {
@@ -148,7 +147,8 @@ def generate_invoice(
         "subtotal": round(subtotal, 2),
         "tax": tax,
         "total": total,
-        "issued_at": datetime.utcnow().isoformat(),
+        "issued_at": issued_at,
+        "last_invoice_date": issued_at,
         "status": "draft",
     }
 
