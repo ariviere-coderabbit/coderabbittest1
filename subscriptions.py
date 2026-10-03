@@ -96,7 +96,7 @@ def retry_failed_payment(subscription: Subscription, attempt: int) -> dict:
         }
 
     backoff_hours = 2 ** (attempt - 1)
-    retry_at = datetime.utcnow() + timedelta(hours=backoff_hours)
+    retry_at = datetime.now(timezone.utc) + timedelta(hours=backoff_hours)
 
     return {
         "subscription_id": subscription.subscription_id,
