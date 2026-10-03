@@ -105,3 +105,37 @@ def validate_transaction(tx: dict) -> dict:
         raise Exception(f"Invalid transaction: {e}")
 
     return tx
+
+
+def filter_by_date_range(
+    transactions: list[dict],
+    start_date: datetime,
+    end_date: datetime,
+) -> list[dict]:
+    """Return transactions whose date falls within [start_date, end_date] inclusive.
+
+    Expects parsed transactions (i.e. `date` is a datetime object, not a string).
+    Raises ValueError if start_date is after end_date.
+    """
+    if start_date > end_date:
+        raise ValueError(
+            f"start_date {start_date.isoformat()} must not be after end_date {end_date.isoformat()}"
+        )
+    return [t for t in transactions if start_date <= t["date"] <= end_date]
+
+
+def top_categories(transactions: list[dict], n: int = 5) -> list[tuple[str, float]]:
+    """Return the top N categories by total amount, sorted descending.
+
+    Returns a list of (category, total_amount) tuples rounded to 2 decimal places.
+    """
+    if n < 1:
+        raise ValueError(f"n must be at least 1, got {n}")
+
+    totals: dict[str, float] = {}
+    for t in transactions:
+        cat = t.get("category", "uncategorized")
+        totals[cat] = totals.get(cat, 0.0) + t["amount"]
+
+    sorted_cats = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    return [(cat, round(total, 2)) for cat, total in sorted_cats[:n]]
