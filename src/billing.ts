@@ -119,6 +119,42 @@ export function groupCyclesByPlan(
   );
 }
 
+/** Exchange rate map from source currency to target currency. */
+export type ExchangeRates = Record<string, number>;
+
+/**
+ * Normalize all BillingCycle amounts to a single target currency using the
+ * provided exchange rates.
+ *
+ * @param cycles       - Array of billing cycles, possibly mixed currencies
+ * @param targetCurrency - ISO 4217 code to convert amounts into (e.g. "USD")
+ * @param rates        - Map of { "EUR": 1.08, "GBP": 1.27, ... } relative to targetCurrency
+ * @returns New cycle objects with amount and currency rewritten; originals unchanged
+ * @throws Error if a cycle's currency is missing from `rates` (and isn't already `targetCurrency`)
+ */
+export function normalizeCurrencies(
+  cycles: BillingCycle[],
+  targetCurrency: string,
+  rates: ExchangeRates,
+): BillingCycle[] {
+  return cycles.map((cycle) => {
+    if (cycle.currency === targetCurrency) {
+      return cycle;
+    }
+    const rate = rates[cycle.currency];
+    if (rate === undefined) {
+      throw new Error(
+        `No exchange rate provided for currency "${cycle.currency}" → "${targetCurrency}"`,
+      );
+    }
+    return {
+      ...cycle,
+      amount: parseFloat((cycle.amount * rate).toFixed(2)),
+      currency: targetCurrency,
+    };
+  });
+}
+
 export function detectAnomalies(
   cycles: BillingCycle[],
   thresholdMultiplier = 2.5
