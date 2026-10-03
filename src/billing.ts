@@ -94,10 +94,8 @@ export function applyLateFee(
     );
   }
 
-  // BUG: uses compound interest instead of simple interest
-  // should be: invoiceAmount * dailyFeeRate * daysLate
   const lateFee = parseFloat(
-    (invoiceAmount * (Math.pow(1 + dailyFeeRate, daysLate) - 1)).toFixed(2)
+    (invoiceAmount * dailyFeeRate * daysLate).toFixed(2)
   );
   const totalDue = parseFloat((invoiceAmount + lateFee).toFixed(2));
 
