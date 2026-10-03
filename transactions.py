@@ -6,14 +6,41 @@ LARGE_TRANSACTION_THRESHOLD = 1000.0
 
 
 def parse_transactions(raw: list[dict]) -> list[dict]:
-    """Parse and normalize a list of raw transaction dicts."""
+    """Parse and normalize a list of raw transaction dicts.
+
+    Raises ValueError for any item missing required fields or with
+    malformed values, with a message that includes the item index.
+    """
     parsed = []
-    for item in raw:
+    for i, item in enumerate(raw):
+        prefix = f"Transaction at index {i}"
+
+        if "id" not in item:
+            raise ValueError(f"{prefix} is missing required field: id")
+        if not item["id"] and item["id"] != 0:
+            raise ValueError(f"{prefix} has an empty id")
+
+        if "amount" not in item:
+            raise ValueError(f"{prefix} is missing required field: amount")
+        try:
+            amount = float(item["amount"])
+        except (TypeError, ValueError):
+            raise ValueError(f"{prefix} has non-numeric amount: {item['amount']!r}")
+        if not math.isfinite(amount):
+            raise ValueError(f"{prefix} has non-finite amount: {item['amount']!r}")
+
+        if "date" not in item:
+            raise ValueError(f"{prefix} is missing required field: date")
+        try:
+            date = datetime.fromisoformat(item["date"])
+        except (TypeError, ValueError):
+            raise ValueError(f"{prefix} has invalid date format: {item['date']!r}")
+
         parsed.append({
             "id": item["id"],
-            "amount": float(item["amount"]),
+            "amount": amount,
             "category": item.get("category", "uncategorized"),
-            "date": datetime.fromisoformat(item["date"]),
+            "date": date,
         })
     return parsed
 
