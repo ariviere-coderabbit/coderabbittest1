@@ -8,7 +8,7 @@ new plan at the new daily rate.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ class ProrationCalculation:
     new_plan_charge: float       # Amount charged for remaining days on the new plan
     net_amount: float            # new_plan_charge - old_plan_credit (positive = owed)
     effective_date: datetime     # When the plan change takes effect
-    days_remaining: int          # Days left in the current billing period
+    days_remaining: float        # Days left in the current billing period
     old_daily_rate: float        # Old plan price / cycle_days
     new_daily_rate: float        # New plan price / cycle_days
 
@@ -67,10 +67,10 @@ def calculate_proration(
             f"[{period_start.isoformat()}, {period_end.isoformat()}]"
         )
 
-    total_days = subscription.plan.cycle_days
-    days_remaining = max((period_end - effective).days, 0)
+    actual_period_days = (period_end - period_start).total_seconds() / 86400
+    days_remaining = max((period_end - effective).total_seconds() / 86400, 0.0)
 
-    old_daily_rate = subscription.plan.price_per_cycle / total_days
+    old_daily_rate = subscription.plan.price_per_cycle / actual_period_days
     new_daily_rate = new_plan.price_per_cycle / new_plan.cycle_days
 
     old_plan_credit = round(old_daily_rate * days_remaining, 2)
@@ -104,8 +104,6 @@ def apply_plan_change(
     proration = calculate_proration(subscription, new_plan, change_date)
     effective = _as_utc(change_date)
 
-    new_period_end = effective + timedelta(days=new_plan.cycle_days)
-
     updated_metadata = {
         **subscription.metadata,
         "proration_adjustment": proration.net_amount,
@@ -116,40 +114,42 @@ def apply_plan_change(
     return replace(
         subscription,
         plan=new_plan,
-        current_period_start=effective,
-        current_period_end=new_period_end,
         metadata=updated_metadata,
     )
+
+
+_DAYS_PER_YEAR = 365
 
 
 def estimate_annual_savings(
     current_plan: "SubscriptionPlan",
     new_plan: "SubscriptionPlan",
-    cycles_per_year: int = 12,
 ) -> dict:
     """Compare the annual cost of two plans.
+
+    Each plan is normalized to a 365-day year via its own cycle_days so plans
+    with different cycle lengths (e.g. monthly vs. annual) are compared fairly.
 
     Args:
         current_plan:   The plan the user is currently on.
         new_plan:       The plan being considered.
-        cycles_per_year: How many billing cycles occur per year (default 12 for monthly).
 
     Returns:
         Dict with annual_cost_current, annual_cost_new, savings (positive = cheaper),
         and savings_percent.
     """
-    if cycles_per_year < 1:
-        raise ValueError(f"cycles_per_year must be at least 1, got {cycles_per_year}")
-
-    annual_current = round(current_plan.price_per_cycle * cycles_per_year, 2)
-    annual_new = round(new_plan.price_per_cycle * cycles_per_year, 2)
+    annual_current = round(current_plan.price_per_cycle / current_plan.cycle_days * _DAYS_PER_YEAR, 2)
+    annual_new = round(new_plan.price_per_cycle / new_plan.cycle_days * _DAYS_PER_YEAR, 2)
     savings = round(annual_current - annual_new, 2)
     savings_percent = round((savings / annual_current * 100), 2) if annual_current > 0 else 0.0
+
+    old_daily_rate = current_plan.price_per_cycle / current_plan.cycle_days
+    new_daily_rate = new_plan.price_per_cycle / new_plan.cycle_days
 
     return {
         "annual_cost_current": annual_current,
         "annual_cost_new": annual_new,
         "savings": savings,
         "savings_percent": savings_percent,
-        "is_upgrade": new_plan.price_per_cycle > current_plan.price_per_cycle,
+        "is_upgrade": new_daily_rate > old_daily_rate,
     }
